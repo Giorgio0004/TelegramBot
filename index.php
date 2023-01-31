@@ -4,9 +4,10 @@ require_once 'dbConfig.php';
 use Telegram\Bot\Api;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
-$client = new Api('5951384798:AAFRQyacCdYMSJQWSa_EUvK9BTkBnJzE9iw');
+$client = new Api('6163316944:AAG-jq_W8sNERqWWCXpWigpMfldEVaR1Wwg');
 $last_update_id=0;
-
+$partenza = false;
+$IDVolo = false;
 
 while(true){
 	$response = $client->getUpdates(['offset'=>$last_update_id, 'timeout'=>5]);
@@ -26,18 +27,37 @@ while(true){
             break;
 
             case "/VOLI":$textAnswer="inserisci una partenza";
+                $partenza = true;
             break;
 
             case "/MYVOLI":$textAnswer="Ecco i tuoi voli!!!🛫🛫\n\n".myVoli($chatId);
             break;
 
+            case "/PRENOTA":$textAnswer="inserisci ID volo";
+                $IDVolo = true;
+            break;
+
             default: 
-                if(str_contains($text,"/voli")){
-                    $textAnswer = "Ecco a te la lista dei voli 🛫🛫\n\n".Voli($text);
+                if($IDVolo == true){
+
+                    if(prenota($chatId,$text,1)){
+                        $textAnswer = "volo prenotato";
+                    }
+                    else{
+                        $textAnswer = "volo non trovato";
+                    }
+                    $controlloID = false;
+                }
+                else if($partenza == true){
+                    $textAnswer = "Ecco a te la lista dei voli 🛫🛫\n\n".Voli($text,1);
+                    $partenza = false;
+                }
+                else if(str_contains($text,"/voli")){
+                    $textAnswer = "Ecco a te la lista dei voli 🛫🛫\n\n".Voli($text,0);
                 }
                 else if(str_contains($text,"/prenota")){
                 
-                    if(prenota($chatId,$text)){
+                    if(prenota($chatId,$text,0)){
                         $textAnswer = "volo prenotato";
                     }
                     else{
@@ -70,7 +90,6 @@ while(true){
         
 	}
 }
-//sd
 
 
 function  jsonAPI(){
@@ -91,35 +110,51 @@ function myVoli($chatId){
 }
 
 
-function Voli($textChat){
+function Voli($textChat,$controllo){
     $voli = jsonAPI();
-    $voli = $voli["data"];
-    $places = getPlace($textChat);
     $index = 0;
+    $voli = $voli["data"];
     $text="";
-    try{
-        foreach($voli as $volo){
-            if(count($places)>1){
+    if($controllo == 0){
+        $places = getPlace($textChat);
+        try{
+            foreach($voli as $volo){
+                if(count($places)>1){
+                    
+                    //c' è destinazione
+        
+                    if(str_contains($volo["departure"]["airport"],$places[0]) || str_contains($volo["departure"]["timezone"],$places[0]) && str_contains($volo["arrival"]["airport"],$places[1]) || str_contains($volo["arrival"]["timezone"],$places[1]) && $index<11){ 
+                        $text.=$index."."." ID volo: ".$volo["flight"]["number"]."\nData: ".$volo["flight_date"]."\nPartenza: ".$volo["departure"]["airport"]." - Città: ". $volo["departure"]["timezone"]."\nTerminal: ".$volo["departure"]["terminal"]."\nArrivo: ".$volo["arrival"]["airport"]." - Città: ".$volo["arrival"]["timezone"]."\n\n";
+                        $index++;
+                    }
+                }
+                else{
+                    if(str_contains($volo["departure"]["airport"],$places[0]) || str_contains($volo["departure"]["timezone"],$places[0])&& $index<11){
+                        $text.=$index."."." ID volo: ".$volo["flight"]["number"]."\nData: ".$volo["flight_date"]."\nPartenza: ".$volo["departure"]["airport"]." - Città: ". $volo["departure"]["timezone"]."\nTerminal: ".$volo["departure"]["terminal"]."\nArrivo: ".$volo["arrival"]["airport"]." - Città: ".$volo["arrival"]["timezone"]."\n\n";
+                        $index++;
+                    }
+                }
                 
-                //c' è destinazione
+                
+            }
+        }
+        catch(Exception $e){
     
-                if(str_contains($volo["departure"]["airport"],$places[0]) || str_contains($volo["departure"]["timezone"],$places[0]) && str_contains($volo["arrival"]["airport"],$places[1]) || str_contains($volo["arrival"]["timezone"],$places[1]) && $index<11){ 
-                    $text.=$index."."." ID volo: ".$volo["flight"]["number"]."\nData: ".$volo["flight_date"]."\nPartenza: ".$volo["departure"]["airport"]." - Città: ". $volo["departure"]["timezone"]."\nTerminal: ".$volo["departure"]["terminal"]."\nArrivo: ".$volo["arrival"]["airport"]." - Città: ".$volo["arrival"]["timezone"]."\n\n";
-                    $index++;
-                }
-            }
-            else{
-                if(str_contains($volo["departure"]["airport"],$places[0]) || str_contains($volo["departure"]["timezone"],$places[0])&& $index<11){
-                    $text.=$index."."." ID volo: ".$volo["flight"]["number"]."\nData: ".$volo["flight_date"]."\nPartenza: ".$volo["departure"]["airport"]." - Città: ". $volo["departure"]["timezone"]."\nTerminal: ".$volo["departure"]["terminal"]."\nArrivo: ".$volo["arrival"]["airport"]." - Città: ".$volo["arrival"]["timezone"]."\n\n";
-                    $index++;
-                }
-            }
-            
-            
         }
     }
-    catch(Exception $e){
-
+    else{
+        try{
+            foreach($voli as $volo){
+                
+                if(str_contains(strtoupper($volo["departure"]["airport"]),strtoupper($textChat)) || str_contains(strtoupper($volo["departure"]["timezone"]),strtoupper($textChat))&& $index<11){
+                    $text.=$index."."." ID volo: ".$volo["flight"]["number"]."\nData: ".$volo["flight_date"]."\nPartenza: ".$volo["departure"]["airport"]." - Città: ". $volo["departure"]["timezone"]."\nTerminal: ".$volo["departure"]["terminal"]."\nArrivo: ".$volo["arrival"]["airport"]." - Città: ".$volo["arrival"]["timezone"]."\n\n";
+                    $index++;
+                }
+            }
+        }
+        catch(Exception $e){
+    
+        }
     }
     
     if($text == ""){
@@ -166,26 +201,45 @@ function getPlace($textChat){
     return $places;
 }
 
-function prenota($chatId,$text){
-    $delimiter = ' ';
-    $words = explode($delimiter, $text);
-    $controlloTrovato = false;
-    foreach($words as $word){
-        
-        if(is_int(intval($word))){
-            $voli = jsonAPI();
-            $voli = $voli["data"];
+function prenota($chatId,$text,$controlloID){
+    if($controlloID == 0){
+        $delimiter = ' ';
+        $words = explode($delimiter, $text);
+        $controlloTrovato = false;
+        foreach($words as $word){
             
-            foreach($voli as $volo){
-                if($volo["flight"]["number"] == $word){
-                    $controlloTrovato = true;
-                    prenotaVolo($volo["flight"]["number"],$chatId,$volo["departure"]["airport"],$volo["arrival"]["airport"],$volo["departure"]["terminal"],$volo["flight_date"]);
-                    break;
+            if(is_int(intval($word))){
+                $voli = jsonAPI();
+                $voli = $voli["data"];
+                
+                foreach($voli as $volo){
+                    if($volo["flight"]["number"] == $word){
+                        $controlloTrovato = true;
+                        prenotaVolo($volo["flight"]["number"],$chatId,$volo["departure"]["airport"],$volo["arrival"]["airport"],$volo["departure"]["terminal"],$volo["flight_date"]);
+                        break;
+                    }
                 }
-            }
 
+            }
         }
     }
+    else{
+        
+        $voli = jsonAPI();
+        $voli = $voli["data"];
+            
+        foreach($voli as $volo){
+            if($volo["flight"]["number"] == $text){
+                $controlloTrovato = true;
+                prenotaVolo($volo["flight"]["number"],$chatId,$volo["departure"]["airport"],$volo["arrival"]["airport"],$volo["departure"]["terminal"],$volo["flight_date"]);
+                break;
+            }
+        }
+
+            
+        
+    }
+    
 
     return $controlloTrovato;
 }
