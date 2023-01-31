@@ -202,10 +202,11 @@ function getPlace($textChat){
 }
 
 function prenota($chatId,$text,$controlloID){
+    $controlloTrovato = false;
     if($controlloID == 0){
         $delimiter = ' ';
         $words = explode($delimiter, $text);
-        $controlloTrovato = false;
+        
         foreach($words as $word){
             
             if(is_int(intval($word))){
@@ -240,7 +241,6 @@ function prenota($chatId,$text,$controlloID){
         
     }
     
-
     return $controlloTrovato;
 }
 
